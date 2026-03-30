@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<style>
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  background: transparent;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: #fff;
+}
+
+/* 🔥 WRAP */
+#wrap {
+  padding: 12px;
+
+  background:
+    radial-gradient(circle at top left, rgba(255,80,0,0.35), transparent 70%),
+    radial-gradient(circle at bottom right, rgba(255,120,0,0.35), transparent 70%),
+    rgba(15,0,0,0.95);
+
+  box-shadow: inset 0 0 20px rgba(255,100,0,0.25);
+}
+
+/* 👥 COUNT */
+#count {
+  font-size: 26px;
+  font-weight: bold;
+  color: #ffae00;
+  text-shadow: 0 0 10px #ff3c00;
+}
+#mlabel {
+  font-size: 12px;
+  color: #ffae00;
+  margin-left: 6px;
+}
+
+/* 📊 BAR */
+#barbg {
+  background: rgba(0,0,0,0.6);
+  height: 18px;
+  margin: 8px 0;
+}
+
+#bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg,#ffae00,#ff3c00);
+  box-shadow: 0 0 10px #ff3c00;
+  transition: width 0.8s ease;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* RANGE LABELS */
+#labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #ffae00;
+}
+
+/* 🎯 GOALS */
+#goals {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.goal {
+  font-size: 11px;
+  padding: 6px;
+  background: rgba(0,0,0,0.6);
+  border: 1px solid rgba(255,60,0,0.3);
+  color: #ffae00;
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="wrap">
+
+  <!-- 👥 COUNT -->
+  <div>
+    <span id="count">…</span>
+    <span id="mlabel">Members</span>
+  </div>
+
+  <!-- 📊 BAR -->
+  <div id="barbg">
+    <div id="bar">
+    </div>
+  </div>
+
+  <!-- RANGE -->
+  <div id="labels">
+    <span id="low">—</span>
+    <span id="high">—</span>
+  </div>
+
+  <!-- 🎯 GOALS -->
+  <div id="goals"></div>
+
+</div>
+
+<script>
+
+var milestones = [50,100,200,300,400,500,750,1000,1500,2000,3000,5000];
+
+/* 🎯 GOALS SYSTEM */
+function getGoals(){
+  return JSON.parse(localStorage.getItem("inferno_goals") || "[]");
+}
+function saveGoals(g){
+  localStorage.setItem("inferno_goals", JSON.stringify(g));
+}
+function createGoal(current){
+  return { target: current + Math.floor(current * 0.25) + 10 };
+}
+function updateGoals(count){
+  let goals = getGoals();
+
+  goals = goals.filter(g => count < g.target);
+
+  if(goals.length === 0){
+    goals.push(createGoal(count));
+  }
+
+  while(goals.length < 5){
+    goals.push(createGoal(goals[goals.length - 1].target));
+  }
+
+  if(goals.length > 5){
+    goals = goals.slice(-5);
+  }
+
+  saveGoals(goals);
+
+  document.getElementById("goals").innerHTML =
+    goals.map(g=>{
+      let diff = g.target - count;
+      return `<div class="goal">🔥 Reach ${g.target} (${diff} left)</div>`;
+    }).join("");
+}
+
+/* 🔥 FETCH */
+fetch('https://api.chess.com/pub/club/group-a162138be57d83c3500191b84a4b325d/members')
+.then(r=>r.json())
+.then(data=>{
+
+  /* UNIQUE COUNT */
+  let all = [
+    ...(data.weekly || []),
+    ...(data.monthly || []),
+    ...(data.all_time || [])
+  ];
+
+  let unique = {};
+  all.forEach(m => unique[m.username] = true);
+
+  let n = Object.keys(unique).length;
+
+  /* RANGE */
+  let low = 0, high = milestones[milestones.length - 1];
+
+  for(let i=0;i<milestones.length;i++){
+    if(milestones[i] < n) low = milestones[i];
+    if(milestones[i] >= n){ high = milestones[i]; break; }
+  }
+
+  if(n === high){
+    let i = milestones.indexOf(high);
+    if(i + 1 < milestones.length){
+      low = high;
+      high = milestones[i + 1];
+    }
+  }
+
+  let pct = high > low ? ((n - low)/(high - low))*100 : 100;
+
+  /* APPLY */
+  document.getElementById('count').textContent = n;
+  document.getElementById('low').textContent = low;
+  document.getElementById('high').textContent = high;
+
+  document.getElementById('bar').style.width = pct + '%';
+  document.getElementById('bartext').textContent = n + " members";
+
+  updateGoals(n);
+
+})
+.catch(()=>{
+  document.getElementById('count').textContent = '—';
+});
+
+</script>
+
+</body>
+</html>
